@@ -1,0 +1,105 @@
+from ibapi.client import EClient
+from ibapi.wrapper import EWrapper
+from ibapi.contract import Contract
+from ibapi.order import *
+from ibapi.common import TickerId
+from datetime import datetime, time
+from threading import Thread
+import time as time_module
+
+def inOpeningRange(now):
+    return time(23, 30) <= now.time() < time(23, 45)
+
+def isMarketOpen(now):
+    return time(23, 30) <= now.time() < time(6)
+
+
+class OpeningRangeHigh(EClient, EWrapper): 
+    def __init__(self, stock_symbols):
+        EClient.__init__(self, self)
+        self.symbols = stock_symbols
+        self.contracts = {}
+        self.ticker_data = {}
+        self.next_order_id = 1
+
+        for i, symbol in enumerate(stock_symbols):
+            self.ticker_data[i] = {
+                'symbol': symbol,
+                'open': None,
+                'high': float('-inf'),
+                'low': float('inf'),
+                'close': None,
+                'breakout_triggered': False
+            }
+
+    def nextValidId(self, orderId):
+        self.next_order_id = orderId
+        print(f"Next valid order ID: {orderId}")
+
+        for tickerId, symbol in self.ticker_data.items():
+            print(f'symbol[symbol] = {symbol['symbol']}')
+            contract = self.create_contract(symbol['symbol'])
+            self.contracts[tickerId] = contract
+            self.reqMktData(tickerId, contract, '', False, False, [])
+    
+    def create_contract(self, symbol):
+        print(f'create contract symbol = {symbol}')
+        contract = Contract()
+        contract.symbol = symbol
+        contract.secType = 'STK'
+        contract.exchange = 'SMART'
+        contract.currency = 'USD'
+        return contract
+    
+    # field is equal to tickType
+    def tickPrice(self, tickerId: TickerId, field, price: float, attrib):
+        now = datetime.now()
+        # print(f'tickerId {tickerId} field {field} price {price}')
+        data = self.ticker_data[tickerId]
+
+        if price <= 0 or field != 2:
+            return  # Invalid price
+
+        if not isMarketOpen(now):
+            print(f'market is close, come back later. current time: {now.time()}')
+        if inOpeningRange(now): # need to add condition for field/tickType
+            if data['open'] is None:
+                data['open'] = price
+            data['high'] = max(data['high'], price)
+            data['low'] = min(data['low'], price)
+            data['close'] = price
+        elif now.time() >= time(23, 45) and not data['breakout_triggered']:
+            # Begin monitoring for breakout
+            if price > data['high']:
+                print(f"\n🚀 {data['symbol']} breakout above opening range at {price:.2f}")
+                # self.place_bracket_order(tickerId, price, data['symbol'])
+
+                data['breakout_triggered'] = True
+        
+
+        print(f'data {data}')
+        
+
+
+def run_bot(symbols):
+    livePort = 7496
+    paperTradePort = 7497
+    app = OpeningRangeHigh(symbols)
+    app.connect('127.0.0.1', livePort, clientId=1)
+
+
+    def run_loop():
+        app.run()
+
+    thread = Thread(target=app.run)
+    thread.start()
+    time_module.sleep(1)
+    # thread = threading.Thread(target=run_loop, daemon=True)
+    # thread.start()
+
+    # while True:
+    #     time_module.sleep(1)
+
+if __name__ == '__main__':
+    run_bot(["RRGB", "TIRX", "TSM"])
+
