@@ -19,15 +19,27 @@ class OpeningRangeHigh(EClient, EWrapper):
         self.testFlow = True
         self.next_order_id = 1
 
+        # for i, symbol in enumerate(stock_symbols):
+        #     self.ticker_data[i] = {
+        #         'symbol': symbol,
+        #         'open': None,
+        #         'high': float('-inf'),
+        #         'low': float('inf'),
+        #         'close': None,
+        #         'breakout_triggered': False
+        #     }
         for i, symbol in enumerate(stock_symbols):
+            # print(i, symbol['symbol'], symbol['positionSize'])
             self.ticker_data[i] = {
-                'symbol': symbol,
+                'symbol': symbol['symbol'],
+                'positionSize': symbol['positionSize'],
                 'open': None,
                 'high': float('-inf'),
                 'low': float('inf'),
                 'close': None,
                 'breakout_triggered': False
             }
+        print(f'this is tickers = ', self.ticker_data)
 
     def nextValidId(self, orderId):
         self.next_order_id = orderId
@@ -90,7 +102,6 @@ class OpeningRangeHigh(EClient, EWrapper):
     
     def place_bracket_order(self, tickerId, symbol, entry_price):
         # calculate quantity
-        
 
         parent = Order()
         parent.orderId = self.next_order_id
@@ -148,5 +159,19 @@ def run_bot(symbols):
     #     time_module.sleep(1)
 
 if __name__ == '__main__':
-    run_bot(["RRGB", "TIRX", "TSM"])
+    # run_bot(["RRGB", "TIRX", ])
+    run_bot([
+        {
+            'symbol': 'RRGB',
+            'positionSize': 700
+        },
+        {
+            'symbol': 'TIRX',
+            'positionSize': 900
+        },
+        {
+            'symbol': 'TSM',
+            'positionSize': 300
+        }
+    ])
 
