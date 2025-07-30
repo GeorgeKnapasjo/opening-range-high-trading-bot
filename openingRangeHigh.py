@@ -57,7 +57,7 @@ class OpeningRangeHigh(EClient, EWrapper):
         if self.testFlow:
             return True
         else:
-            return time(23, 30) <= now.time() < time(6)
+            return (time(23,30) <= now <= time(23,59,59)) or (time(0,0) <= now < time(6,0))
     
     # field is equal to tickType
     def tickPrice(self, tickerId: TickerId, field, price: float, attrib):
