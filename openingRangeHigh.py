@@ -8,12 +8,12 @@ from threading import Thread
 import time as time_module
 
 class OpeningRangeHigh(EClient, EWrapper): 
-    def __init__(self, stock_symbols):
+    def __init__(self, stock_symbols, testFlow):
         EClient.__init__(self, self)
         self.symbols = stock_symbols
         self.contracts = {}
         self.ticker_data = {}
-        self.testFlow = True
+        self.testFlow = testFlow
         self.next_order_id = 1
 
         for i, symbol in enumerate(stock_symbols):
@@ -51,7 +51,7 @@ class OpeningRangeHigh(EClient, EWrapper):
         if self.testFlow:
             return True
         else:
-            return time(23, 30) <= now.time() < time(23, 45)
+            return time(23, 30) <= now.time() < time(23, 35)
 
     def isMarketOpen(self, now):
         if self.testFlow:
@@ -76,21 +76,21 @@ class OpeningRangeHigh(EClient, EWrapper):
             data['low'] = min(data['low'], price)
             data['close'] = price
         elif self.isMarketOpen(now) and not data['breakout_triggered']:
+            print(f'data = {data}')
+            print(f'self.tickers = {self.ticker_data[tickerId]}')
             # Begin monitoring for breakout
             if price > data['high']:
                 print(f"\n🚀 {data['symbol']} breakout above opening range at {price:.2f}")
-                # self.place_bracket_order(tickerId, price, data['symbol'])
-
+                self.place_bracket_order(tickerId, data['symbol'], price)
                 data['breakout_triggered'] = True
-        print(f'data = {data}')
-        print(f'self.tickers = {self.ticker_data[tickerId]}')
+
     
     def place_bracket_order(self, tickerId, symbol, entry_price):
         # calculate quantity
         position = self.ticker_data[tickerId]['positionSize']
         numOfShares = int(position / entry_price)
-        print(f'entering purchase order to buy {numOfShares} of {self.ticker_data[tickerId]} at {entry_price}')
-
+        print(f'entering purchase order to buy {numOfShares} of {symbol} at {entry_price}')
+        print(f'ticker data at time of purchase = {self.ticker_data[tickerId]}')
 
         parent = Order()
         parent.orderId = self.next_order_id
@@ -104,7 +104,7 @@ class OpeningRangeHigh(EClient, EWrapper):
         take_profit.action = "SELL"
         take_profit.orderType = "LMT"
         take_profit.totalQuantity = numOfShares
-        take_profit.lmtPrice = round(entry_price * 1.05, 2)
+        take_profit.lmtPrice = round(entry_price * 1.1, 2)
         take_profit.parentId = parent.orderId
         take_profit.transmit = False
 
@@ -131,8 +131,8 @@ class OpeningRangeHigh(EClient, EWrapper):
 def run_bot(symbols):
     livePort = 7496
     paperTradePort = 7497
-    app = OpeningRangeHigh(symbols)
-    app.connect('127.0.0.1', livePort, clientId=1)
+    app = OpeningRangeHigh(symbols, False)
+    app.connect('127.0.0.1', paperTradePort, clientId=1)
 
 
     def run_loop():
