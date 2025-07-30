@@ -7,9 +7,6 @@ from datetime import datetime, time
 from threading import Thread
 import time as time_module
 
-
-
-
 class OpeningRangeHigh(EClient, EWrapper): 
     def __init__(self, stock_symbols):
         EClient.__init__(self, self)
@@ -19,17 +16,7 @@ class OpeningRangeHigh(EClient, EWrapper):
         self.testFlow = True
         self.next_order_id = 1
 
-        # for i, symbol in enumerate(stock_symbols):
-        #     self.ticker_data[i] = {
-        #         'symbol': symbol,
-        #         'open': None,
-        #         'high': float('-inf'),
-        #         'low': float('inf'),
-        #         'close': None,
-        #         'breakout_triggered': False
-        #     }
         for i, symbol in enumerate(stock_symbols):
-            # print(i, symbol['symbol'], symbol['positionSize'])
             self.ticker_data[i] = {
                 'symbol': symbol['symbol'],
                 'positionSize': symbol['positionSize'],
@@ -75,7 +62,6 @@ class OpeningRangeHigh(EClient, EWrapper):
     # field is equal to tickType
     def tickPrice(self, tickerId: TickerId, field, price: float, attrib):
         now = datetime.now()
-        # print(f'tickerId {tickerId} field {field} price {price}')
         data = self.ticker_data[tickerId]
 
         if price <= 0 or field != 2:
@@ -96,25 +82,28 @@ class OpeningRangeHigh(EClient, EWrapper):
                 # self.place_bracket_order(tickerId, price, data['symbol'])
 
                 data['breakout_triggered'] = True
-        
         print(f'data = {data}')
         print(f'self.tickers = {self.ticker_data[tickerId]}')
     
     def place_bracket_order(self, tickerId, symbol, entry_price):
         # calculate quantity
+        position = self.ticker_data[tickerId]['positionSize']
+        numOfShares = int(position / entry_price)
+        print(f'entering purchase order to buy {numOfShares} of {self.ticker_data[tickerId]} at {entry_price}')
+
 
         parent = Order()
         parent.orderId = self.next_order_id
         parent.action = "BUY"
         parent.orderType = "MKT"
-        parent.totalQuantity = 10
+        parent.totalQuantity = numOfShares
         parent.transmit = False
 
         take_profit = Order()
         take_profit.orderId = self.next_order_id + 1
         take_profit.action = "SELL"
         take_profit.orderType = "LMT"
-        take_profit.totalQuantity = 10
+        take_profit.totalQuantity = numOfShares
         take_profit.lmtPrice = round(entry_price * 1.05, 2)
         take_profit.parentId = parent.orderId
         take_profit.transmit = False
@@ -124,7 +113,7 @@ class OpeningRangeHigh(EClient, EWrapper):
         stop_loss.action = "SELL"
         stop_loss.orderType = "STP"
         stop_loss.auxPrice = round(entry_price * 0.95, 2)
-        stop_loss.totalQuantity = 10
+        stop_loss.totalQuantity = numOfShares
         stop_loss.parentId = parent.orderId
         stop_loss.transmit = True
 
