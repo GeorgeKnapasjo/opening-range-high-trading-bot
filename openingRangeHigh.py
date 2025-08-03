@@ -6,6 +6,14 @@ from ibapi.common import TickerId
 from datetime import datetime, time
 from threading import Thread
 import time as time_module
+import logging
+
+logging.basicConfig(
+    filename='app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filemode='a' 
+)
 
 class OpeningRangeHigh(EClient, EWrapper): 
     def __init__(self, stock_symbols, testFlow):
@@ -48,16 +56,10 @@ class OpeningRangeHigh(EClient, EWrapper):
         return contract
     
     def inOpeningRange(self, now):
-        if self.testFlow:
-            return True
-        else:
-            return time(23, 30) <= now.time() < time(23, 35)
+        return True if self.testFlow else time(23, 30) <= now.time() < time(23, 35)
 
     def isMarketOpen(self, now):
-        if self.testFlow:
-            return True
-        else:
-            return (time(23,30) <= now <= time(23,59,59)) or (time(0,0) <= now < time(6,0))
+        return True if self.testFlow else (time(23,30) <= now.time() <= time(23,59,59)) or (time(0,0) <= now.time() < time(6,0))
     
     # field is equal to tickType
     def tickPrice(self, tickerId: TickerId, field, price: float, attrib):
@@ -68,19 +70,19 @@ class OpeningRangeHigh(EClient, EWrapper):
             return  # Invalid price
 
         if not self.isMarketOpen(now):
-            print(f'market is close, come back later. current time: {now.time()}')
+            logging.info('market closed, please come back later')
+            return
         if self.inOpeningRange(now): # need to add condition for field/tickType
             if data['open'] is None:
                 data['open'] = price
             data['high'] = max(data['high'], price)
             data['low'] = min(data['low'], price)
             data['close'] = price
+            logging.info(f'data set to {data}')
         elif self.isMarketOpen(now) and not data['breakout_triggered']:
-            print(f'data = {data}')
-            print(f'self.tickers = {self.ticker_data[tickerId]}')
             # Begin monitoring for breakout
             if price > data['high']:
-                print(f"\n🚀 {data['symbol']} breakout above opening range at {price:.2f}")
+                logging.info(f"\n🚀 {data['symbol']} breakout above opening range at {price:.2f}")
                 self.place_bracket_order(tickerId, data['symbol'], price)
                 data['breakout_triggered'] = True
 
@@ -89,8 +91,9 @@ class OpeningRangeHigh(EClient, EWrapper):
         # calculate quantity
         position = self.ticker_data[tickerId]['positionSize']
         numOfShares = int(position / entry_price)
-        print(f'entering purchase order to buy {numOfShares} of {symbol} at {entry_price}')
-        print(f'ticker data at time of purchase = {self.ticker_data[tickerId]}')
+
+        logging.info(f'entering purchase order to buy {numOfShares} of {symbol} at {entry_price}')
+        logging.info(f'ticker data at time of purchase = {self.ticker_data[tickerId]}')
 
         parent = Order()
         parent.orderId = self.next_order_id
